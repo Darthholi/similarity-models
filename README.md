@@ -5,6 +5,9 @@ Source codes to accompany the following publications:
 - https://ieeexplore.ieee.org/document/8892877 (older manuscript: https://arxiv.org/abs/1904.12577)
 - TBD (older manuscript: https://arxiv.org/abs/2011.07964) 
 
+Dataset is hosted under kaggle datasets:
+- https://www.kaggle.com/martholi/anonymized-invoices
+
 All codes and datasets are published under the LICENSE attached (GNU AFFERO GENERAL PUBLIC LICENSE).
 Any derivative work or service should be published under the same license (for any other licensing options, feel free to reach out).
 
