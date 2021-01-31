@@ -20,3 +20,5 @@ experiments_ft.py --verbose=1 --sqlite_source="article_anon_a.sqlite" --neighbou
 --cls_extract_types="['amount_total', 'amount_total_base', 'amount_total_tax', 'amount_rounding', 'amount_paid', 'amount_due', 'tax_detail_base', 'tax_detail_rate', 'tax_detail_tax', 'tax_detail_total', 'account_num', 'bank_num', 'iban', 'bic', 'const_sym', 'spec_sym', 'var_sym', 'invoice_id', 'order_id', 'customer_id', 'date_issue', 'date_uzp', 'date_due', 'terms', 'sender_ic', 'sender_dic', 'recipient_ic', 'recipient_dic', 'sender_name', 'sender_addrline', 'recipient_name', 'recipient_addrline', 'page_current', 'page_total', 'phone_num']"
 --weights_separate --key_metric=custom --key_metric_mode=max --n_epochs=2 --limit=400
 ```
+
+For running the same experiments as were in the article, the commands in experiments.txt were used.
