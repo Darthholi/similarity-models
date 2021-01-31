@@ -86,6 +86,10 @@ class CopyModel(object):
 
 def evaluating_copy(eval_ds, eval_size, model, cls_extract_types, verbose_progress=True, plots_prefix="copy-"):
     ft_per_wb = defaultdict(lambda: np.zeros((2, 2), dtype=int))  # predicted, real cls_extract_type per wordbox
+    capacity_tp = 0
+    capacity_tp_ft = 0
+    capacity_fn = 0
+    capacity_fn_ft = 0
     ft_satisfication = defaultdict(lambda: [0, 0, 0])
     # success (needed & provided), miss (needed & not provided), extra (not needed & provided) ... we do not care
     # about extras btw
@@ -100,8 +104,10 @@ def evaluating_copy(eval_ds, eval_size, model, cls_extract_types, verbose_progre
         x = {item: batch[0][item] for item in batch[0] if
              item not in FtypesTrgtDocsTextsSqliteNearest.ANNOTATION_COLUMNS}
         predicted_data = model.predict_on_batch(x)
-        for b, (wb_poso, pred, truth, truth_weights, annotation) in enumerate(
+
+        for b, (wb_poso, pred, truth, truth_weights, annotation, nearest_annotation) in enumerate(
                 zip(x['wb-poso'], predicted_data, batch[1], batch[2], annotations['annotations'],
+                    annotations['nearest-annotations'],
                     )):
             # first remove batched-padded items:
             this_count = truth.shape[0]
@@ -162,6 +168,32 @@ def evaluating_copy(eval_ds, eval_size, model, cls_extract_types, verbose_progre
                 lables_eval = eval_match_annotations(repair_annotations(trgt_fl_annots), pred_annots)
                 for restype in ft_per_annotation[ft_name].keys():
                     ft_per_annotation[ft_name][restype] += lables_eval[restype]
+                
+                # embedding - capacity stats:
+                needed_fts = defaultdict(lambda: 0)
+                provided_fts = defaultdict(lambda: 0)
+                for anot, ids in zip(annotation['cls_extract_type'], annotation['ids']):
+                    if len(ids) > 0:
+                        needed_fts[anot] += len(ids)
+                for anot, ids in zip(nearest_annotation['cls_extract_type'], nearest_annotation['ids']):
+                    if len(ids) > 0:
+                        provided_fts[anot] += len(ids)
+                needed_fts = dict(needed_fts)
+                provided_fts = dict(provided_fts)
+                
+                for ft in set(needed_fts.keys()).union(set(provided_fts.keys())):
+                    isneed = ft in needed_fts
+                    isprov = ft in provided_fts
+                    if isneed and isprov:
+                        ft_satisfication[ft][0] += 1
+                        capacity_tp += needed_fts[ft]
+                        capacity_tp_ft += 1
+                    elif isneed and not isprov:
+                        ft_satisfication[ft][1] += 1
+                        capacity_fn += needed_fts[ft]
+                        capacity_fn_ft += 1
+                    elif not isneed and isprov:
+                        ft_satisfication[ft][2] += 1
     
     print("micro nongb f1:")
     for ft in cls_extract_types:
@@ -175,6 +207,14 @@ def evaluating_copy(eval_ds, eval_size, model, cls_extract_types, verbose_progre
     lbl_tot = GWME_sum(ft_per_annotation)
     print("total micro lbl: (f1: {})".format(GWME_f1(lbl_tot)))
     print(dict(lbl_tot))
+    
+    print("from nearest  capacity acc:")
+    print("... {}".format(capacity_tp / (capacity_fn + capacity_tp)))
+    
+    print("from nearest  capacity in types acc:")
+    print("... {}".format(capacity_tp_ft / (capacity_fn_ft + capacity_tp_ft)))
+    return totalmicrof1
+    
     return totalmicrof1
 
 

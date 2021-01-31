@@ -73,6 +73,7 @@ def xcount_1(y_true, y_pred):
 @click.option('--emb_size', default=640)
 @click.option('--no_refine', is_flag=True)
 @click.option('--debug_predict_same_lengths', is_flag=True)
+@click.option('--plots_prefix', default="reuse")
 def run_keras_rendered_experiment_binary(sqlite_source,
                                          checkpoint_resume,
                                          mode,
@@ -100,7 +101,8 @@ def run_keras_rendered_experiment_binary(sqlite_source,
                                          n_att,
                                          emb_size,
                                          no_refine,
-                                        debug_predict_same_lengths
+                                        debug_predict_same_lengths,
+                                        plots_prefix,
                                          ):
     """
     About class weights:
@@ -331,7 +333,7 @@ def run_keras_rendered_experiment_binary(sqlite_source,
             print("...")
             if n_epochs > 0:
                 model.load_weights(weights_best_fname)
-            get_report_f(test_ds, test_size, model, verbose)()
+            get_report_f(test_ds, test_size, model, verbose, plots_prefix)()
 
 
 if __name__ == "__main__":

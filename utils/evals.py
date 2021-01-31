@@ -212,7 +212,7 @@ def distances_and_classified_with_weights_v2(y_true, y_pred):
     positive_distances_weighted = positive_distances * y_true[..., 1]
     negative_distances_weighted = negative_distances * y_true[..., 1]
     
-    tripletlike_base = 0.4 + K.max(positive_distances) - K.min(negative_distances)
+    tripletlike_base = 0.4 + K.max(positive_distances) + K.min(-negative_distances)
     tripletlike_loss = K.maximum(tripletlike_base, 0)  # ... we have unbalanced numbers of positive and negative classes
     # so  we took the max positive that must be lesser than the minimal negative
     # tripletlike_loss = K.switch(K.greater(tripletlike_base, 0.0), tripletlike_base, 0.0001 * tripletlike_base)
@@ -242,10 +242,10 @@ def distances_and_classified_with_weights_and_mean(y_true, y_pred):
     positive_distances = y_true[..., 0] * y_pred[..., 1]
     negative_distances = (1.0 - y_true[..., 0]) * y_pred[..., 1]
     positive_distances_real = positive_distances * real_samples
-    negative_distances_real_for_min = negative_distances * real_samples + (1.0 - real_samples) * 100000.0
+    #negative_distances_real_for_min = negative_distances * real_samples + (1.0 - real_samples) * 100000.0
     negative_distances_real = negative_distances * real_samples
     
-    tripletlike_base = 0.4 + K.max(positive_distances_real) - K.min(negative_distances_real_for_min)
+    tripletlike_base = 0.4 + K.max(positive_distances_real) + K.min(-negative_distances_real)
     tripletlike_loss = K.maximum(tripletlike_base, 0)  # ... we have unbalanced numbers of positive and negative classes
     # so  we took the max positive that must be lesser than the minimal negative
     # tripletlike_loss = K.switch(K.greater(tripletlike_base, 0.0), tripletlike_base, 0.0001 * tripletlike_base)
@@ -342,6 +342,11 @@ def GWME_sum(dcts):
 
 def evaluating_f_reuse(eval_ds, eval_size, model, verbose_progress=True, plots_prefix=None):
     ft_per_wb = defaultdict(lambda: np.zeros((2, 2), dtype=int))  # predicted, real cls_extract_type per wordbox
+    ft_per_wb_capacity = defaultdict(lambda: np.zeros((2, 2), dtype=int))  # predicted, real type per wordbox
+    capacity_tp = 0
+    capacity_tp_ft = 0
+    capacity_fn = 0
+    capacity_fn_ft = 0
     ft_satisfication = defaultdict(lambda: [0, 0, 0])
     # success (needed & provided), miss (needed & not provided), extra (not needed & provided) ... we do not care about extras btw
     
@@ -369,16 +374,22 @@ def evaluating_f_reuse(eval_ds, eval_size, model, verbose_progress=True, plots_p
             voted_cls_extract_type = are_wordboxes_in_cls_extract_type(pred, nearest_cls_extract_type_to_ordered_ids)
             truth_cls_extract_type = are_wordboxes_in_cls_extract_type(truth, nearest_cls_extract_type_to_ordered_ids)
 
-            # the same in different format:
-            truth = np.zeros((len(wb_poso), len(annotation['cls_extract_type'])))
-            pred = np.zeros((len(wb_poso), len(annotation['cls_extract_type'])))
-            for ft_bb_ids, (ft_i, ft) in zip(annotation['ids'], enumerate(annotation['cls_extract_type'])):
-                truth[ft_bb_ids, ft_i] = 1.0
-                if ft in voted_cls_extract_type:
-                    pred[voted_cls_extract_type[ft], ft_i] = 1.0
+            # the same in different format for drawing:
+            ft_all_ordered = list(sorted(set(annotation['cls_extract_type'] + nearest_annotation['cls_extract_type'])))
+            cls_extract_type_order_now = {ft: i for i, ft in enumerate(ft_all_ordered)}
+            truth_draw = np.zeros((len(wb_poso), len(ft_all_ordered)))
+            pred_draw = np.zeros((len(wb_poso), len(ft_all_ordered)))
+            for ft_bb_ids, ft in zip(annotation['ids'], annotation['cls_extract_type']):
+                ft_i = cls_extract_type_order_now[ft]
+                truth_draw[ft_bb_ids, ft_i] = 1.0
+            for ft in cls_extract_type_order_now:
+                ft_i = cls_extract_type_order_now[ft]
+                if ft in voted_cls_extract_type and isinstance(voted_cls_extract_type[ft], list):
+                    pred_draw[voted_cls_extract_type[ft], ft_i] = 1.0
                 
-            produce_drawings(istep, b, annotation['cls_extract_type'], truth, pred, x['wb-bbox'][b],
-                             x['nearest-annotated'][b], x['nearest-wb-bbox'][b], plots_prefix)
+            produce_drawings(istep, b, ft_all_ordered, truth_draw, pred_draw, x['wb-bbox'][b],
+                             x['nearest-annotated'][b],
+                             x['nearest-wb-bbox'][b], plots_prefix)
             # per wordbox stats:
             for ft in truth_cls_extract_type.keys():
                 tp = np.sum(voted_cls_extract_type[ft] & truth_cls_extract_type[ft])
@@ -391,17 +402,28 @@ def evaluating_f_reuse(eval_ds, eval_size, model, verbose_progress=True, plots_p
                 ft_per_wb[ft][0, 1] += fn
             
             # embedding - capacity stats:
-            needed_fts = {anot for anot, ids in zip(annotation['cls_extract_type'], annotation['ids']) if len(ids) > 0}
-            provided_fts = {anot for anot, ids in zip(nearest_annotation['cls_extract_type'], nearest_annotation['ids']) if
-                            len(ids) > 0}
+            needed_fts = defaultdict(lambda : 0)
+            provided_fts = defaultdict(lambda : 0)
+            for anot, ids in zip(annotation['cls_extract_type'], annotation['ids']):
+                if len(ids) > 0:
+                    needed_fts[anot] += len(ids)
+            for anot, ids in zip(nearest_annotation['cls_extract_type'], nearest_annotation['ids']):
+                if len(ids) > 0:
+                    provided_fts[anot] += len(ids)
+            needed_fts = dict(needed_fts)
+            provided_fts = dict(provided_fts)
             
-            for ft in needed_fts.union(provided_fts):
+            for ft in set(needed_fts.keys()).union(set(provided_fts.keys())):
                 isneed = ft in needed_fts
                 isprov = ft in provided_fts
                 if isneed and isprov:
                     ft_satisfication[ft][0] += 1
+                    capacity_tp += needed_fts[ft]
+                    capacity_tp_ft += 1
                 elif isneed and not isprov:
                     ft_satisfication[ft][1] += 1
+                    capacity_fn += needed_fts[ft]
+                    capacity_fn_ft += 1
                 elif not isneed and isprov:
                     ft_satisfication[ft][2] += 1
     
@@ -413,6 +435,12 @@ def evaluating_f_reuse(eval_ds, eval_size, model, verbose_progress=True, plots_p
     print("total micro nonbg f1:")
     totalmicrof1 = T_f1(sum([ft_per_wb[ft] for ft in ft_per_wb]))
     print("... {}".format(totalmicrof1))
+    
+    print("from nearest  capacity acc:")
+    print("... {}".format(capacity_tp / (capacity_fn + capacity_tp)))
+
+    print("from nearest  capacity in types acc:")
+    print("... {}".format(capacity_tp_ft / (capacity_fn_ft + capacity_tp_ft)))
     return totalmicrof1
 
 
