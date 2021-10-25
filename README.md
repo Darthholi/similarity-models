@@ -3,7 +3,7 @@ Similarity and data extraction
 
 Source codes to accompany the following publications:
 - https://ieeexplore.ieee.org/document/8892877 (older manuscript: https://arxiv.org/abs/1904.12577)
-- TBD (older manuscript: https://arxiv.org/abs/2011.07964) 
+- https://rdcu.be/cmoAk (or manuscript here: https://arxiv.org/abs/2011.07964) 
 
 Dataset is hosted under kaggle datasets:
 - https://www.kaggle.com/martholi/anonymized-invoices
