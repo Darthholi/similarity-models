@@ -7,6 +7,7 @@ Source codes to accompany the following publications:
 
 Dataset is hosted under kaggle datasets:
 - https://www.kaggle.com/martholi/anonymized-invoices
+- Note that there can never be any pictures or text content, as the data must be anonymized!
 
 All codes and datasets are published under the LICENSE attached (GNU AFFERO GENERAL PUBLIC LICENSE).
 Any derivative work or service should be published under the same license (for any other licensing options, feel free to reach out).
